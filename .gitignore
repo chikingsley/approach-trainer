@@ -25,3 +25,7 @@ dist-ssr
 
 # downloaded clips (large, re-fetchable)
 clips/
+
+# secrets
+.env
+.instagram-cookies.txt
