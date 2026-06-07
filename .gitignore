@@ -23,8 +23,9 @@ dist-ssr
 *.sln
 *.sw?
 
-# downloaded clips (large, re-fetchable)
-clips/
+# downloaded clips — heavy media only; keep derived data (manifest, transcripts)
+clips/raw/
+clips/frames/
 
 # secrets
 .env
