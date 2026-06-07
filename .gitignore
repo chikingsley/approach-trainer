@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# downloaded clips (large, re-fetchable)
+clips/
