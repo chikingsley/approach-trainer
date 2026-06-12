@@ -30,3 +30,10 @@ clips/frames/
 # secrets
 .env
 .instagram-cookies.txt
+
+# generated data + python cache
+data/*.db
+data/*.db-wal
+data/*.db-shm
+**/__pycache__/
+*.pyc
