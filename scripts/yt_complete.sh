@@ -19,7 +19,7 @@ rm -f /tmp/yt75/complete.done
 log "download start (single-format -f b to dodge fragment 403s)"
 yt-dlp --cookies-from-browser "chrome:$PROFILE" \
   --extractor-args "youtube:player_client=web_safari" \
-  -f "best[height<=480]/b[height<=480]/b" \
+  -f "bv*[height<=1920]+ba/b[height<=1920]/b" --fragment-retries 5 \
   --download-archive "$SRC/.archive.txt" \
   --sleep-requests 2 --sleep-interval 3 --ignore-errors \
   -o "$SRC/%(id)s.%(ext)s" \
