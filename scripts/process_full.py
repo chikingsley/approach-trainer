@@ -30,7 +30,7 @@ def client_for_thread() -> SuperwhisperClient:
     return c
 
 IG = Path("/mnt/media/gmk-server-share/approach-clips/ig")
-RU = Path.home() / "ru-pickup"
+RU = Path("/mnt/media/gmk-server-share/approach-clips/ru")
 
 # slug -> (approacher display name, handle/channel, source, lang, mp4_dir)
 CREATORS = {
