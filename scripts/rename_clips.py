@@ -2,7 +2,7 @@
 parsing (the model wraps JSON in ```json fences, which broke generate_json).
 
 Reuses stored transcripts/turns — no re-transcribing. Updates speakers + turns name fields.
-Run in the tajik-asr uv env:  uv run python rename_clips.py <db>
+Run:  uv run --project ~/github/approach-trainer scripts/rename_clips.py <db>
 """
 
 import json
@@ -11,6 +11,7 @@ import sqlite3
 import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Any
 
 from superwhisper_api.text.client import SuperwhisperClient
 
@@ -26,7 +27,7 @@ def client():
     return c
 
 
-def parse_lenient(text: str) -> dict:
+def parse_lenient(text: str) -> dict[str, Any]:
     """Handle bare JSON, ```json fences, or prose with an embedded object."""
     t = (text or "").strip()
     t = re.sub(r"^```(?:json)?\s*", "", t)
@@ -36,11 +37,13 @@ def parse_lenient(text: str) -> dict:
         t = m.group(0)
     try:
         return json.loads(t)
-    except Exception:  # noqa: BLE001
+    except (json.JSONDecodeError, TypeError):
         return {}
 
 
-def get_names(transcript: str, approacher: str, speakers: list[str], lang: str) -> dict:
+def get_names(
+    transcript: str, approacher: str, speakers: list[str], lang: str
+) -> dict[str, str]:
     others = [s for s in speakers if s != APPROACHER]
     if not others or not transcript.strip():
         return {}
@@ -54,13 +57,20 @@ def get_names(transcript: str, approacher: str, speakers: list[str], lang: str) 
     )
     for _ in range(2):
         try:
-            r = client().generate("claude-sonnet-4-6",
-                                  [{"role": "user", "content": prompt}], max_tokens=200)
+            r = client().generate(
+                "claude-sonnet-4-6",
+                [{"role": "user", "content": prompt}],
+                max_tokens=200,
+            )
             data = parse_lenient(r.text)
             if data:
-                return {k: v for k, v in data.items()
-                        if v and str(v).strip().lower() not in ("null", "none", "")}
-        except Exception:  # noqa: BLE001
+                return {
+                    str(k): str(v)
+                    for k, v in data.items()
+                    if v and str(v).strip().lower() not in ("null", "none", "")
+                }
+        # Resilience: retry a transient LLM/network failure once, then return {}.
+        except Exception:  # noqa: BLE001, S112
             continue
     return {}
 
@@ -81,10 +91,14 @@ def work(row):
     for t in turns:
         if t.get("speaker") in found and t.get("speaker") != APPROACHER:
             t["name"] = found[t["speaker"]]
-    return cid, json.dumps(speakers, ensure_ascii=False), json.dumps(turns, ensure_ascii=False)
+    return (
+        cid,
+        json.dumps(speakers, ensure_ascii=False),
+        json.dumps(turns, ensure_ascii=False),
+    )
 
 
-def main():
+def main() -> None:
     db_path = sys.argv[1]
     db = sqlite3.connect(db_path, timeout=60)
     db.execute("PRAGMA busy_timeout=60000")
@@ -99,7 +113,10 @@ def main():
         for i, fut in enumerate(as_completed(futs), 1):
             cid, smap, turns = fut.result()
             if smap:
-                db.execute("UPDATE clips SET speakers=?, turns=? WHERE id=?", (smap, turns, cid))
+                db.execute(
+                    "UPDATE clips SET speakers=?, turns=? WHERE id=?",
+                    (smap, turns, cid),
+                )
                 updated += 1
                 if updated % 50 == 0:
                     db.commit()

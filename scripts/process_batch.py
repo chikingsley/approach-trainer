@@ -1,16 +1,18 @@
 """Process a batch of clips: 5-run compile-down + diarized turns + names -> SQLite.
 
-Run inside the tajik-asr uv env (has omni_curator + superwhisper_api):
-  cd ~/github/peacock-asr/projects/tajik-asr && uv run python <this> <runs_dir> <db>
+Run inside the approach-trainer uv env:
+  uv run --project ~/github/approach-trainer scripts/process_batch.py <runs_dir> <db>
 
 Expects <runs_dir>/run0.jsonl .. run4.jsonl produced by:
   superwhisper-audio --paths-file paths.txt --jsonl runN.jsonl --diarize --language eng
 """
 
 import json
+import re
 import sqlite3
 import sys
 from pathlib import Path
+from typing import Any
 
 from omni_curator.create.fuse import compile_down
 from superwhisper_api.audio.formats import words_to_turns
@@ -36,6 +38,9 @@ EN_INSTRUCTION = (
 
 APPROACHER = "speaker_0"
 PRE_ROLL = 0.4
+JsonRecord = dict[str, Any]
+JsonObject = dict[str, Any]
+SpeakerMap = dict[str, dict[str, str | None]]
 
 
 def find_creator(clip_id: str) -> str | None:
@@ -45,9 +50,9 @@ def find_creator(clip_id: str) -> str | None:
     return None
 
 
-def load_runs(runs_dir: Path) -> dict[str, list[dict]]:
+def load_runs(runs_dir: Path) -> dict[str, list[JsonRecord]]:
     """clip_id -> list of run records (each: {transcript, raw_response})."""
-    by_clip: dict[str, list[dict]] = {}
+    by_clip: dict[str, list[JsonRecord]] = {}
     for rf in sorted(runs_dir.glob("run*.jsonl")):
         for line in rf.read_text().splitlines():
             if not line.strip():
@@ -60,21 +65,21 @@ def load_runs(runs_dir: Path) -> dict[str, list[dict]]:
     return by_clip
 
 
-def turns_from(words: list[dict], names: dict[str, str]) -> list[dict]:
-    out = []
-    for t in words_to_turns(words):
-        out.append({
+def turns_from(words: list[JsonRecord], names: dict[str, str]) -> list[JsonObject]:
+    return [
+        {
             "speaker": t.speaker,
             "name": names.get(t.speaker),
             "text": t.text.strip(),
             "start": round(t.start, 2),
             "end": round(t.end, 2),
             "duration": round(t.end - t.start, 2),
-        })
-    return out
+        }
+        for t in words_to_turns(words)
+    ]
 
 
-def pause_and_opener(words: list[dict]) -> tuple[float, str]:
+def pause_and_opener(words: list[JsonRecord]) -> tuple[float, str]:
     w = [x for x in words if x.get("type") == "word"]
     his = [x for x in w if x.get("speaker_id") == APPROACHER]
     first = his[0] if his else (w[0] if w else None)
@@ -85,13 +90,16 @@ def pause_and_opener(words: list[dict]) -> tuple[float, str]:
             opener.append(x["text"])
         elif opener:
             break
-    import re
     text = re.sub(r"\s+([.,!?;:])", r"\1", " ".join(opener)).strip()
     return round(pause, 2), text
 
 
-def extract_names(client: SuperwhisperClient, transcript: str, approacher_name: str,
-                  speakers: list[str]) -> dict[str, str]:
+def extract_names(
+    client: SuperwhisperClient,
+    transcript: str,
+    approacher_name: str,
+    speakers: list[str],
+) -> dict[str, str]:
     """Ask the LLM which non-approacher speakers reveal a name. speaker_0 = approacher."""
     others = [s for s in speakers if s != APPROACHER]
     if not others:
@@ -104,9 +112,12 @@ def extract_names(client: SuperwhisperClient, transcript: str, approacher_name: 
         f'Return JSON: {{"speaker_1": "Name or null", ...}}.\n\nTranscript:\n{transcript}'
     )
     try:
-        data = client.generate_json("claude-sonnet-4-6", [{"role": "user", "content": prompt}],
-                                    max_tokens=300)
-        return {k: v for k, v in data.items() if v and str(v).lower() != "null"}
+        data = client.generate_json(
+            "claude-sonnet-4-6", [{"role": "user", "content": prompt}], max_tokens=300
+        )
+        return {
+            str(k): str(v) for k, v in data.items() if v and str(v).lower() != "null"
+        }
     except Exception as e:  # noqa: BLE001
         print(f"  [name extract failed: {e}]")
         return {}
@@ -125,51 +136,89 @@ def main() -> None:
             print(f"SKIP {cid}: creator not found")
             continue
         name, handle, source, lang = CREATORS[creator]
-        variants = [r.get("transcript", "").strip() for r in recs if r.get("transcript")]
+        variants = [
+            r.get("transcript", "").strip() for r in recs if r.get("transcript")
+        ]
         # representative run = the one with the most words (richest diarization)
         best = max(recs, key=lambda r: len(r.get("raw_response", {}).get("words", [])))
         words = best.get("raw_response", {}).get("words", [])
 
-        resolved = compile_down(variants, language="English", script="Latin",
-                                client=client, instruction=EN_INSTRUCTION) if variants else ""
-        speakers = sorted({w.get("speaker_id") for w in words if w.get("type") == "word"})
+        resolved = (
+            compile_down(
+                variants,
+                language="English",
+                script="Latin",
+                client=client,
+                instruction=EN_INSTRUCTION,
+            )
+            if variants
+            else ""
+        )
+        speakers = sorted(
+            {
+                speaker_id
+                for w in words
+                if w.get("type") == "word"
+                and isinstance((speaker_id := w.get("speaker_id")), str)
+            }
+        )
         names = {APPROACHER: name}
         names.update(extract_names(client, resolved or variants[0], name, speakers))
         turns = turns_from(words, names)
         pause_at, opener = pause_and_opener(words)
-        speaker_map = {APPROACHER: {"name": name, "role": "approacher"}}
+        speaker_map: SpeakerMap = {APPROACHER: {"name": name, "role": "approacher"}}
         for s in speakers:
             if s != APPROACHER:
                 speaker_map[s] = {"name": names.get(s), "role": "target"}
 
-        db.execute("""INSERT OR REPLACE INTO clips
+        db.execute(
+            """INSERT OR REPLACE INTO clips
           (id,creator,creator_handle,source,lang,file_path,duration,
            approacher_name,approacher_handle,approacher_speaker,
            pause_at,opener,full_transcript,num_speakers,turns,speakers,status,processed_at)
-          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'))""", (
-            cid, creator, handle, source, lang,
-            str(IG / creator / f"{cid}.mp4"),
-            round(float(best.get("duration") or 0), 2),
-            name, handle, APPROACHER,
-            pause_at, opener, resolved, len(speakers),
-            json.dumps(turns, ensure_ascii=False),
-            json.dumps(speaker_map, ensure_ascii=False),
-            "resolved",
-        ))
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'))""",
+            (
+                cid,
+                creator,
+                handle,
+                source,
+                lang,
+                str(IG / creator / f"{cid}.mp4"),
+                round(float(best.get("duration") or 0), 2),
+                name,
+                handle,
+                APPROACHER,
+                pause_at,
+                opener,
+                resolved,
+                len(speakers),
+                json.dumps(turns, ensure_ascii=False),
+                json.dumps(speaker_map, ensure_ascii=False),
+                "resolved",
+            ),
+        )
         for i, r in enumerate(recs):
-            db.execute("INSERT OR REPLACE INTO runs (clip_id,run_idx,text,created_at) "
-                       "VALUES (?,?,?,datetime('now'))", (cid, i, r.get("transcript", "")))
+            db.execute(
+                "INSERT OR REPLACE INTO runs (clip_id,run_idx,text,created_at) "
+                "VALUES (?,?,?,datetime('now'))",
+                (cid, i, r.get("transcript", "")),
+            )
         db.commit()
 
         # ---- inspection print ----
-        print(f"\n{'='*70}\n{creator}/{cid}  ({len(variants)} runs, {len(speakers)} speakers)")
+        print(
+            f"\n{'=' * 70}\n{creator}/{cid}  ({len(variants)} runs, {len(speakers)} speakers)"
+        )
         print(f"  pause_at={pause_at}s  opener: {opener!r}")
         print(f"  names: {names}")
         print(f"  RESOLVED: {resolved[:220]}")
         print("  TURNS:")
         for t in turns[:8]:
             who = t["name"] or t["speaker"]
-            print(f"    [{t['start']:>5.1f}-{t['end']:>5.1f}s {t['duration']:>4.1f}s] {who}: {t['text'][:80]}")
+            print(
+                f"    [{t['start']:>5.1f}-{t['end']:>5.1f}s {t['duration']:>4.1f}s] "
+                f"{who}: {t['text'][:80]}"
+            )
 
     db.close()
     print(f"\nDone: {len(by_clip)} clips -> {db_path}")

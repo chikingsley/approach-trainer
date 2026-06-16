@@ -1,0 +1,75 @@
+[project]
+name = "approach-trainer"
+version = "0.1.0"
+description = "Approach-training media ingestion, transcription, and segmentation tooling."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "omni-curator",
+    "superwhisper-api",
+]
+
+[tool.uv.sources]
+omni-curator = { path = "../peacock-asr/packages/omni-curator", editable = true }
+superwhisper-api = { path = "../peacock-asr/packages/superwhisper-api", editable = true }
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15.12",
+    "ty>=0.0.35",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+# "ruff max": enable everything, then turn off only the genuinely impractical or
+# formatter-conflicting rules. Matches the peacock-asr package style used by these scripts.
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "D",        # these are one-shot pipeline scripts, not a documented library
+    "COM812",   # trailing-comma rule conflicts with the formatter
+    "ISC001",   # implicit-str-concat rule conflicts with the formatter
+    "ANN401",   # allow typing.Any at genuine dynamic boundaries
+    "TD002", "TD003", "FIX002",  # don't require issue links on TODOs
+    "EM101", "EM102", "TRY003",  # allow inline exception messages
+    "PLR0913",  # pipeline entry points legitimately take many knobs
+    "PLC0415",  # heavy/optional deps imported lazily on purpose
+    "T201",     # CLI / pipeline tooling: stdout is the interface
+    "PLR2004",  # heuristic thresholds (>=4 turns/min, 0.3 scene score) read fine inline
+    "INP001",   # scripts/ is a flat script dir, not an importable package
+    "ANN",      # main()/work() closures in these scripts are not a typed public API
+    "C901", "PLR0911", "PLR0912", "PLR0915",  # pipeline mains are long by nature
+    "S324",     # md5 is a content fingerprint / cache key here, never a security hash
+    "PLW1510",  # subprocess(check=...) is set deliberately per call (False = best-effort)
+]
+
+[tool.ruff.lint.per-file-ignores]
+# S608: every f-string-interpolated SQL fragment is a table or column *name*
+#   (`sources`/`clips` from argparse `choices=`, or a literal column picked in
+#   code) — never a data value. All data values are bound as `?` parameters.
+# S603/S607: these invoke known media binaries (ffmpeg/ffprobe) and `uv run
+#   superwhisper-audio` with list-form argv (never shell=True). Every argument is
+#   a module constant, an internally-generated temp path, or a DB-derived local
+#   file path — no external (web/user) input flows into the command.
+# RUF001/RUF002: Cyrillic creator names / Russian prompt text use letters that
+#   resemble Latin — intentional, this pipeline ingests Russian-language clips.
+"scripts/backfill_durations.py" = ["S603", "S607", "S608"]
+"scripts/build_manifest.py" = ["S603", "S607"]
+"scripts/detect_cuts.py" = ["S603", "S607", "S608"]
+"scripts/factory.py" = ["S603", "S607", "S608"]
+"scripts/segment.py" = ["S608"]
+"scripts/segment_trial.py" = ["S603", "S607"]
+"scripts/transcribe_longform.py" = ["S603", "S607"]
+"scripts/process_full.py" = ["RUF001", "RUF002"]
+"scripts/rename_clips.py" = ["RUF001", "RUF002"]
+
+[tool.ty.environment]
+# Scripts run in this project's uv environment. Mark scripts/ as a first-party
+# source root so sibling-module imports (e.g. `segment`) resolve without runtime
+# sys.path manipulation.
+python = ".venv"
+root = ["scripts"]
+
+[tool.ty.rules]
+unused-ignore-comment = "error"

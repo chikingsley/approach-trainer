@@ -2,8 +2,9 @@
 the cut timestamps (JSON array of seconds) in the DB. Downscales to 320w for speed
 (cuts are global frame changes — detected fine at low res). Resumable: skips rows that
 already have cuts. Re-run anytime as new videos land.
-  python detect_cuts.py
+  uv run --project ~/github/approach-trainer scripts/detect_cuts.py
 """
+
 import json
 import re
 import sqlite3
@@ -21,16 +22,28 @@ def cuts_for(path: str) -> list[float] | None:
         return None
     try:
         err = subprocess.run(
-            ["ffmpeg", "-hide_banner", "-i", path, "-an",
-             "-vf", f"scale=320:-2,select='gt(scene,{THRESH})',showinfo",
-             "-f", "null", "-"],
-            capture_output=True, text=True, timeout=900).stderr
+            [
+                "ffmpeg",
+                "-hide_banner",
+                "-i",
+                path,
+                "-an",
+                "-vf",
+                f"scale=320:-2,select='gt(scene,{THRESH})',showinfo",
+                "-f",
+                "null",
+                "-",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=900,
+        ).stderr
         return [round(float(m), 2) for m in re.findall(r"pts_time:([0-9.]+)", err)]
-    except Exception:  # noqa: BLE001
+    except (subprocess.SubprocessError, ValueError):
         return None
 
 
-def run(table: str, pathcol: str):
+def run(table: str, pathcol: str) -> None:
     db = sqlite3.connect(DB, timeout=60)
     rows = db.execute(
         f"SELECT id, {pathcol} FROM {table} WHERE cuts IS NULL AND {pathcol} IS NOT NULL"
@@ -42,8 +55,10 @@ def run(table: str, pathcol: str):
         for fut in as_completed(futs):
             cuts = fut.result()
             if cuts is not None:
-                db.execute(f"UPDATE {table} SET cuts=? WHERE id=?",
-                           (json.dumps(cuts), futs[fut]))
+                db.execute(
+                    f"UPDATE {table} SET cuts=? WHERE id=?",
+                    (json.dumps(cuts), futs[fut]),
+                )
                 done += 1
                 if done % 200 == 0:
                     db.commit()
@@ -53,7 +68,7 @@ def run(table: str, pathcol: str):
     print(f"DONE {table}: {done} videos got cuts", flush=True)
 
 
-def main():
+def main() -> None:
     run("clips", "file_path")
     run("sources", "path")
     print("ALL CUTS DONE", flush=True)

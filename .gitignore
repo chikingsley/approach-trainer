@@ -35,5 +35,10 @@ clips/frames/
 data/*.db
 data/*.db-wal
 data/*.db-shm
+data/**/*.db
+data/**/*.db-wal
+data/**/*.db-shm
+data/douyin/f2_douyin.yaml
+data/douyin/logs/
 **/__pycache__/
 *.pyc

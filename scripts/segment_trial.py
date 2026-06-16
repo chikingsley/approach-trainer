@@ -1,7 +1,8 @@
 """Trial: feed diarized turns + ffmpeg scene-cut timestamps to Sonnet, have it
 mark boundaries between fully-separate interactions with a '\\n\\n---\\n\\n' line.
-Run in tajik env:  uv run python segment_trial.py <clip_id>
+Run:  uv run --project ~/github/approach-trainer scripts/segment_trial.py <clip_id>
 """
+
 import json
 import re
 import sqlite3
@@ -15,19 +16,30 @@ DB = "/home/simon/github/approach-trainer/data/clips.db"
 
 def scene_cuts(path: str, thresh: float = 0.3) -> list[float]:
     out = subprocess.run(
-        ["ffmpeg", "-i", path, "-vf", f"select='gt(scene,{thresh})',metadata=print",
-         "-an", "-f", "null", "-"],
-        capture_output=True, text=True, check=False,
+        [
+            "ffmpeg",
+            "-i",
+            path,
+            "-vf",
+            f"select='gt(scene,{thresh})',metadata=print",
+            "-an",
+            "-f",
+            "null",
+            "-",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
     ).stderr
-    cuts = [round(float(m), 1) for m in re.findall(r"pts_time:([0-9.]+)", out)]
-    return cuts
+    return [round(float(m), 1) for m in re.findall(r"pts_time:([0-9.]+)", out)]
 
 
 def main():
     cid = sys.argv[1]
     db = sqlite3.connect(DB)
     path, turns_json = db.execute(
-        "SELECT file_path, turns FROM clips WHERE id=?", (cid,)).fetchone()
+        "SELECT file_path, turns FROM clips WHERE id=?", (cid,)
+    ).fetchone()
     turns = json.loads(turns_json)
     cuts = scene_cuts(path)
 
@@ -56,12 +68,15 @@ def main():
         f"SCENE CUT TIMESTAMPS (seconds): {cuts}\n\n"
         f"TRANSCRIPT TURNS:\n{turns_block}"
     )
-    print(f"clip={cid}  turns={len(turns)}  cuts={len(cuts)}  "
-          f"prompt_chars={len(prompt)} (~{len(prompt)//4} tok)\n")
-    print(f"CUTS: {cuts}\n{'='*70}")
+    print(
+        f"clip={cid}  turns={len(turns)}  cuts={len(cuts)}  "
+        f"prompt_chars={len(prompt)} (~{len(prompt) // 4} tok)\n"
+    )
+    print(f"CUTS: {cuts}\n{'=' * 70}")
     client = SuperwhisperClient()
-    r = client.generate("claude-sonnet-4-6", [{"role": "user", "content": prompt}],
-                        max_tokens=6000)
+    r = client.generate(
+        "claude-sonnet-4-6", [{"role": "user", "content": prompt}], max_tokens=6000
+    )
     print(r.text)
 
 

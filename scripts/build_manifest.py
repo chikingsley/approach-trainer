@@ -25,9 +25,19 @@ PRE_ROLL = 0.4  # seconds of lead-in to keep before his first word
 
 def duration(path: Path) -> float:
     out = subprocess.run(
-        ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-         "-of", "csv=p=0", str(path)],
-        capture_output=True, text=True, check=False,
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "csv=p=0",
+            str(path),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
     ).stdout.strip()
     return float(out) if out else 0.0
 
@@ -39,8 +49,11 @@ def build_entry(rec: dict) -> dict | None:
     if not mp4.exists():
         return None
 
-    words = [w for w in rec.get("raw_response", {}).get("words", [])
-             if w.get("type") == "word"]
+    words = [
+        w
+        for w in rec.get("raw_response", {}).get("words", [])
+        if w.get("type") == "word"
+    ]
     if not words:
         return None
 
@@ -75,8 +88,8 @@ def build_entry(rec: dict) -> dict | None:
 def main() -> None:
     entries = []
     for tfile in TRANSCRIPTS.glob("*.jsonl"):
-        for line in tfile.read_text().splitlines():
-            line = line.strip()
+        for raw in tfile.read_text().splitlines():
+            line = raw.strip()
             if not line:
                 continue
             rec = json.loads(line)
@@ -90,8 +103,10 @@ def main() -> None:
     OUT.write_text(json.dumps(entries, indent=2))
     print(f"wrote {len(entries)} entries -> {OUT.relative_to(ROOT)}")
     for e in entries:
-        print(f"  {e['id']}  pause@{e['pause_at']:>5.1f}s  "
-              f"{e['num_speakers']}spk  opener: {e['opener'][:60]!r}")
+        print(
+            f"  {e['id']}  pause@{e['pause_at']:>5.1f}s  "
+            f"{e['num_speakers']}spk  opener: {e['opener'][:60]!r}"
+        )
 
 
 if __name__ == "__main__":
