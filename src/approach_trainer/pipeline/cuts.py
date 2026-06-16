@@ -12,12 +12,14 @@ import subprocess
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-DB = str(Path.home() / "github/approach-trainer/data/clips.db")
+from approach_trainer.paths import DEFAULT_DB
+
+DB = str(DEFAULT_DB)
 THRESH = 0.3
 WORKERS = 6
 
 
-def cuts_for(path: str) -> list[float] | None:
+def detect_cuts(path: str) -> list[float] | None:
     if not Path(path).exists():
         return None
     try:
@@ -51,7 +53,7 @@ def run(table: str, pathcol: str) -> None:
     print(f"{table}: {len(rows)} videos need cut detection", flush=True)
     done = 0
     with ThreadPoolExecutor(max_workers=WORKERS) as pool:
-        futs = {pool.submit(cuts_for, p): cid for cid, p in rows}
+        futs = {pool.submit(detect_cuts, p): cid for cid, p in rows}
         for fut in as_completed(futs):
             cuts = fut.result()
             if cuts is not None:

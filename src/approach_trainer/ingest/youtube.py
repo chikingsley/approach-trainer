@@ -17,9 +17,9 @@ from superwhisper_api.languages import resolve
 
 from approach_trainer.paths import (
     DATA_DIR,
+    DEFAULT_DB,
     DEFAULT_MEDIA_ROOT,
     DEFAULT_YOUTUBE_CONFIG,
-    PROJECT_ROOT,
 )
 
 if TYPE_CHECKING:
@@ -57,7 +57,6 @@ class YoutubeRegistry:
     media_root: Path
     video_format: str
     player_client: str
-    factory_trigger: Path
     profiles: dict[str, BrowserProfile]
     channels: tuple[YoutubeChannel, ...]
 
@@ -99,9 +98,6 @@ def load_registry(path: Path = DEFAULT_YOUTUBE_CONFIG) -> YoutubeRegistry:
     channels_raw = _list(raw.get("channels", []), "channels")
 
     media_root = Path(str(settings.get("media_root", DEFAULT_MEDIA_ROOT))).expanduser()
-    factory_trigger = Path(
-        str(settings.get("factory_trigger", PROJECT_ROOT / "bin" / "factory_trigger.sh"))
-    ).expanduser()
 
     profiles = {
         name: _profile_from_raw(name, _mapping(value, f"profiles.{name}"))
@@ -117,7 +113,6 @@ def load_registry(path: Path = DEFAULT_YOUTUBE_CONFIG) -> YoutubeRegistry:
         media_root=media_root,
         video_format=str(settings.get("format", "bv*[height<=1920]+ba/b[height<=1920]/b")),
         player_client=str(settings.get("player_client", "web_safari")),
-        factory_trigger=factory_trigger,
         profiles=profiles,
         channels=channels,
     )
@@ -148,8 +143,10 @@ def download_channels(
             )
 
     if run_factory and not dry_run and results:
+        # Reconcile newly-downloaded videos into the DB. Detached Python (no shell);
+        # the factory takes its own lock, so overlapping triggers are safe.
         subprocess.Popen(
-            ["/usr/bin/bash", str(registry.factory_trigger)],
+            [sys.executable, "-m", "approach_trainer.pipeline.factory", str(DEFAULT_DB)],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             start_new_session=True,
@@ -183,7 +180,7 @@ def download_channel(
         "--fragment-retries",
         "5",
         "--download-archive",
-        str(out_dir / ".archive.txt"),
+        str(out_dir / "archive.txt"),
         "--sleep-requests",
         str(profile.sleep_requests),
         "--sleep-interval",

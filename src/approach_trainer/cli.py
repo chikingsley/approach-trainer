@@ -7,23 +7,31 @@ import importlib
 import sys
 from pathlib import Path
 
-from approach_trainer.youtube import (
+from approach_trainer.ingest.youtube import (
     YoutubeRegistry,
     download_channels,
     load_registry,
     refresh_cookies,
 )
 
-# Pipeline steps keep their own argparse main(); the CLI forwards the remaining
-# argv so `approach-trainer factory <db> …` runs the same code as
-# `python -m approach_trainer.factory <db> …`.
-PIPELINE_STEPS = ("factory", "segment", "cuts", "durations", "names", "retag")
+# Pipeline steps keep their own argparse main(); the CLI forwards the remaining argv
+# so `approach-trainer factory <db> …` runs the same code as
+# `python -m approach_trainer.pipeline.factory <db> …`. Maps command -> module.
+PIPELINE_STEPS = {
+    "factory": "approach_trainer.pipeline.factory",
+    "segment": "approach_trainer.pipeline.segment",
+    "cuts": "approach_trainer.pipeline.cuts",
+    "durations": "approach_trainer.pipeline.durations",
+    "retag": "approach_trainer.pipeline.retag",
+    "speaker-identity": "approach_trainer.pipeline.speaker_identity",
+    "instagram": "approach_trainer.ingest.instagram",
+}
 
 
-def _run_step(name: str, rest: list[str]) -> int:
-    module = importlib.import_module(f"approach_trainer.{name}")
+def _run_step(command: str, rest: list[str]) -> int:
+    module = importlib.import_module(PIPELINE_STEPS[command])
     saved = sys.argv
-    sys.argv = [f"approach-trainer {name}", *rest]
+    sys.argv = [f"approach-trainer {command}", *rest]
     try:
         result = module.main()
     finally:

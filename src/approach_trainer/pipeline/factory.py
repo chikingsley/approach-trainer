@@ -16,9 +16,8 @@ Resumable + idempotent: rows already present are skipped; safe to re-run anytime
 """
 
 import argparse
-import hashlib
+import fcntl
 import json
-import re
 import sqlite3
 import subprocess
 import threading
@@ -30,15 +29,18 @@ from superwhisper_api.audio.formats import words_to_turns
 from superwhisper_api.languages import language_name, scribe_code, script_of
 from superwhisper_api.text.client import SuperwhisperClient
 
-from approach_trainer.segment import ensure_outcome_columns, segment_one
+from approach_trainer.paths import AUDIO_CACHE, CLIPS_ROOT, COURSES_ROOT, PROJECT_ROOT
+from approach_trainer.pipeline.audio import drop_cache, extract_audio, fid_of
+from approach_trainer.pipeline.cuts import detect_cuts
+from approach_trainer.pipeline.segment import ensure_outcome_columns, segment_one
 
-COURSES = Path("/mnt/media/pickup-courses")
-CLIPS_ROOT = Path("/mnt/media/gmk-server-share/approach-clips")
+COURSES = COURSES_ROOT
 CLIP_DIRS = ["ig", "yt", "douyin"]
-AUD = CLIPS_ROOT / "factory-audio"
-APPROACH = Path(__file__).resolve().parents[2]
-THRESH = 0.3
+AUD = AUDIO_CACHE
+APPROACH = PROJECT_ROOT
 RUNS = 5
+
+
 def instruction_for(lang_name: str) -> str:
     return (
         f"Below are several independent ASR hypotheses of the SAME {lang_name} audio (a pickup/"
@@ -47,10 +49,6 @@ def instruction_for(lang_name: str) -> str:
         "dropped words. Keep slang and filler. No speaker labels or commentary. Output ONLY the "
         "transcript in <transcript></transcript>."
     )
-
-
-def fid_of(p: Path) -> str:
-    return hashlib.md5(str(p).encode()).hexdigest()
 
 
 def probe_duration(path: str) -> float:
@@ -63,34 +61,6 @@ def probe_duration(path: str) -> float:
         return round(float(out), 2) if out else 0.0
     except (subprocess.SubprocessError, ValueError):
         return 0.0
-
-
-def detect_cuts(path: str) -> list[float]:
-    try:
-        err = subprocess.run(
-            ["ffmpeg", "-hide_banner", "-i", path, "-an",
-             "-vf", f"scale=320:-2,select='gt(scene,{THRESH})',showinfo", "-f", "null", "-"],
-            capture_output=True, text=True, timeout=900,
-        ).stderr
-        return [round(float(m), 2) for m in re.findall(r"pts_time:([0-9.]+)", err)]
-    except (subprocess.SubprocessError, ValueError):
-        return []
-
-
-def extract_audio(v: Path) -> Path | None:
-    AUD.mkdir(parents=True, exist_ok=True)
-    flac = AUD / f"{fid_of(v)}.flac"
-    if not flac.exists():
-        try:
-            r = subprocess.run(
-                ["ffmpeg", "-y", "-v", "error", "-nostdin", "-i", str(v), "-vn", "-ac", "1",
-                 "-ar", "16000", "-c:a", "flac", str(flac)], check=False, timeout=600,
-            )
-        except subprocess.TimeoutExpired:
-            return None
-        if r.returncode != 0:
-            return None
-    return flac
 
 
 def batch_scribe(flacs: list[Path], scribe_code: str, tag: str,
@@ -155,7 +125,7 @@ def finalize_one(db: sqlite3.Connection, client: SuperwhisperClient, v: Path,
     lang = extra.get("lang", "en")
     lang_name, script = language_name(lang), script_of(lang)
 
-    cuts = detect_cuts(str(v))
+    cuts = detect_cuts(str(v)) or []
     duration = probe_duration(str(v))
     variants = [r.get("transcript", "").strip() for r in recs if r.get("transcript")]
     best = max(recs, key=lambda r: len(r.get("raw_response", {}).get("words", [])), default={})
@@ -206,6 +176,7 @@ def finalize_one(db: sqlite3.Connection, client: SuperwhisperClient, v: Path,
           s.get("outcome_detail", ""), s["summary"]) for i, s in enumerate(segs)],
     )
     db.commit()
+    drop_cache(v)  # transcript is persisted; the cached flac is no longer needed
     return f"OK {table} {v.name} -> {len(turns)} turns, {len(cuts)} cuts, {len(segs)} segs"
 
 
@@ -226,6 +197,15 @@ def main() -> None:
     ap.add_argument("--workers", type=int, default=16)
     ap.add_argument("--scan-only", action="store_true", help="report new videos, do not process")
     args = ap.parse_args()
+
+    if not args.scan_only:
+        # Single-writer lock: a download trigger fires this, and runs must not overlap.
+        lock = Path("/tmp/approach-factory.lock").open("w")  # noqa: S108, SIM115  # held for run
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            print("another factory run is active; exiting", flush=True)
+            return
 
     db = sqlite3.connect(args.db, timeout=60)
     db.execute(

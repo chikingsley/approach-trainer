@@ -6,6 +6,7 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "omni-curator[youtube]",
     "superwhisper-api",
+    "gallery-dl",
 ]
 
 [project.scripts]
@@ -65,14 +66,16 @@ ignore = [
 #   file path — no external (web/user) input flows into the command.
 # RUF001/RUF002: Cyrillic creator names / Russian prompt text use letters that
 #   resemble Latin — intentional, this pipeline ingests Russian-language clips.
-"src/approach_trainer/durations.py" = ["S603", "S607", "S608"]
-"src/approach_trainer/cuts.py" = ["S603", "S607", "S608"]
-"src/approach_trainer/factory.py" = ["S603", "S607", "S608"]
-"src/approach_trainer/segment.py" = ["S608"]
-"src/approach_trainer/retag.py" = ["S608"]
-"src/approach_trainer/names.py" = ["RUF001", "RUF002"]
+"src/approach_trainer/pipeline/durations.py" = ["S603", "S607", "S608"]
+"src/approach_trainer/pipeline/cuts.py" = ["S603", "S607", "S608"]
+"src/approach_trainer/pipeline/factory.py" = ["S603", "S607", "S608"]
+"src/approach_trainer/pipeline/audio.py" = ["S603", "S607"]
+"src/approach_trainer/pipeline/segment.py" = ["S608"]
+"src/approach_trainer/pipeline/retag.py" = ["S608"]
+"src/approach_trainer/pipeline/speaker_identity.py" = ["RUF001", "RUF002"]
 "src/approach_trainer/cli.py" = ["T201"]
-"src/approach_trainer/youtube.py" = ["S603", "T201"]
+"src/approach_trainer/ingest/youtube.py" = ["S603", "T201"]
+"src/approach_trainer/ingest/instagram.py" = ["S603", "S607"]
 
 [tool.ty.environment]
 # Pipeline modules live in the package and import each other normally.

@@ -13,7 +13,7 @@ Run AFTER the factory backlog finishes writing (so all rows are covered):
 import sqlite3
 import sys
 
-from approach_trainer.segment import ensure_outcome_columns
+from approach_trainer.pipeline.segment import ensure_outcome_columns
 
 # legacy outcome -> (meta, sub, detail)
 MAP = {
