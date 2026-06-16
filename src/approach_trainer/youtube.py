@@ -13,6 +13,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
+from superwhisper_api.languages import resolve
+
 from approach_trainer.paths import (
     DATA_DIR,
     DEFAULT_MEDIA_ROOT,
@@ -98,7 +100,7 @@ def load_registry(path: Path = DEFAULT_YOUTUBE_CONFIG) -> YoutubeRegistry:
 
     media_root = Path(str(settings.get("media_root", DEFAULT_MEDIA_ROOT))).expanduser()
     factory_trigger = Path(
-        str(settings.get("factory_trigger", PROJECT_ROOT / "scripts" / "factory_trigger.sh"))
+        str(settings.get("factory_trigger", PROJECT_ROOT / "bin" / "factory_trigger.sh"))
     ).expanduser()
 
     profiles = {
@@ -163,7 +165,10 @@ def download_channel(
     limit: int | None = None,
     dry_run: bool = False,
 ) -> DownloadResult:
-    out_dir = registry.media_root / channel.group / channel.slug
+    # Layout: yt/<2-letter-lang>/<creator>/ — strip any "<lang>-" prefix the slug carries.
+    lang2 = resolve(channel.language).iso639_1 or channel.language
+    creator = channel.slug.removeprefix(f"{lang2}-")
+    out_dir = registry.media_root / "yt" / lang2 / creator
     out_dir.mkdir(parents=True, exist_ok=True)
     cmd = [
         sys.executable,

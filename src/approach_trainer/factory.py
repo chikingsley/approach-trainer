@@ -6,7 +6,7 @@ For each NEW video (not yet in the DB) it runs:
 
 Root decides the target table:
   /mnt/media/pickup-courses/...            -> sources  (long-form; id = md5(path))
-  /mnt/media/.../approach-clips/{ig,ru,yt,douyin}/<creator>/<id>.mp4 -> clips (id = stem)
+  /mnt/media/.../approach-clips/{ig,yt/<lang>,douyin}/<creator>/<id>.mp4 -> clips (id = stem)
 
 Usage:
   uv run --project ~/github/approach-trainer approach-trainer factory <db>
@@ -34,7 +34,7 @@ from approach_trainer.segment import ensure_outcome_columns, segment_one
 
 COURSES = Path("/mnt/media/pickup-courses")
 CLIPS_ROOT = Path("/mnt/media/gmk-server-share/approach-clips")
-CLIP_DIRS = ["ig", "ru", "yt", "douyin", "yt-intl"]
+CLIP_DIRS = ["ig", "yt", "douyin"]
 AUD = CLIPS_ROOT / "factory-audio"
 APPROACH = Path(__file__).resolve().parents[2]
 THRESH = 0.3
@@ -129,13 +129,15 @@ def target_for(v: Path) -> tuple[str, dict] | None:
     for d in CLIP_DIRS:
         base = CLIPS_ROOT / d
         if base in v.parents:
-            creator = v.relative_to(base).parts[0]
-            if d == "yt-intl":
-                # folders are slugged "<lang>-<creator>-<videos|shorts>", e.g. es-alvaroreyes-videos
-                lang = creator.split("-", 1)[0]  # es/fr/zh/de -> resolve() maps to spa/fra/zho/deu
+            rel = v.relative_to(base)
+            if d == "yt":
+                # yt/<lang>/<creator>/<id>.mp4 — lang resolves via superwhisper_api.languages
+                lang = rel.parts[0]
+                creator = rel.parts[1] if len(rel.parts) > 1 else rel.parts[0]
                 return "clips", {"creator": creator, "source": "youtube", "lang": lang}
-            source = {"ig": "instagram", "yt": "youtube", "douyin": "douyin"}.get(d, d)
-            lang = {"ru": "ru", "douyin": "zh"}.get(d, "en")
+            creator = rel.parts[0]
+            source = {"ig": "instagram", "douyin": "douyin"}[d]
+            lang = "zh" if d == "douyin" else "en"
             return "clips", {"creator": creator, "source": source, "lang": lang}
     return None
 

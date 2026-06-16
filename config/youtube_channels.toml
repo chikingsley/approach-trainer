@@ -2,7 +2,7 @@
 media_root = "/mnt/media/gmk-server-share/approach-clips"
 format = "bv*[height<=1920]+ba/b[height<=1920]/b"
 player_client = "web_safari"
-factory_trigger = "/home/simon/github/approach-trainer/scripts/factory_trigger.sh"
+factory_trigger = "/home/simon/github/approach-trainer/bin/factory_trigger.sh"
 
 [profiles.kasm_profile_1]
 browser = "chrome"
