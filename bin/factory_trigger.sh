@@ -9,5 +9,5 @@ DB="$HOME/github/approach-trainer/data/clips.db"
 exec 9>/tmp/factory_backlog.lock
 flock 9
 echo "[$(date '+%F %H:%M:%S')] factory trigger fired" >> /tmp/factory_trigger.log
-uv run --project "$APPROACH" "$APPROACH/scripts/factory.py" "$DB" --workers 6 \
+uv run --project "$APPROACH" approach-trainer factory "$DB" --workers 6 \
   >> /tmp/factory_trigger.log 2>&1

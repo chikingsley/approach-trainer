@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+import importlib
+import sys
 from pathlib import Path
 
 from approach_trainer.youtube import (
@@ -11,6 +13,22 @@ from approach_trainer.youtube import (
     load_registry,
     refresh_cookies,
 )
+
+# Pipeline steps keep their own argparse main(); the CLI forwards the remaining
+# argv so `approach-trainer factory <db> …` runs the same code as
+# `python -m approach_trainer.factory <db> …`.
+PIPELINE_STEPS = ("factory", "segment", "cuts", "durations", "names", "retag")
+
+
+def _run_step(name: str, rest: list[str]) -> int:
+    module = importlib.import_module(f"approach_trainer.{name}")
+    saved = sys.argv
+    sys.argv = [f"approach-trainer {name}", *rest]
+    try:
+        result = module.main()
+    finally:
+        sys.argv = saved
+    return result if isinstance(result, int) else 0
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -44,7 +62,15 @@ def main(argv: list[str] | None = None) -> int:
     download_parser.set_defaults(func=_cmd_download)
 
     list_parser.set_defaults(func=_cmd_list)
+
+    for step in PIPELINE_STEPS:
+        step_parser = subparsers.add_parser(step, help=f"run the {step} pipeline step")
+        step_parser.add_argument("rest", nargs=argparse.REMAINDER,
+                                 help="arguments forwarded to the step")
+
     args = parser.parse_args(argv)
+    if args.command in PIPELINE_STEPS:
+        return _run_step(args.command, args.rest)
     registry = load_registry(args.config) if args.config else load_registry()
     return args.func(registry, args)
 

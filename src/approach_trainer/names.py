@@ -2,7 +2,7 @@
 parsing (the model wraps JSON in ```json fences, which broke generate_json).
 
 Reuses stored transcripts/turns — no re-transcribing. Updates speakers + turns name fields.
-Run:  uv run --project ~/github/approach-trainer scripts/rename_clips.py <db>
+Run:  uv run --project ~/github/approach-trainer approach-trainer names <db>
 """
 
 import json

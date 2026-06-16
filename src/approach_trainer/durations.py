@@ -1,5 +1,5 @@
 """Backfill real clip durations via ffprobe (DB duration field is mostly 0 from Scribe).
-Run:  uv run --project ~/github/approach-trainer scripts/backfill_durations.py <db>
+Run:  uv run --project ~/github/approach-trainer approach-trainer durations <db>
 """
 
 import sqlite3

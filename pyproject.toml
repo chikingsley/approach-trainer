@@ -31,7 +31,7 @@ dev = [
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-src = ["src", "scripts"]
+src = ["src"]
 
 # "ruff max": enable everything, then turn off only the genuinely impractical or
 # formatter-conflicting rules. Matches the peacock-asr package style used by these scripts.
@@ -65,24 +65,19 @@ ignore = [
 #   file path — no external (web/user) input flows into the command.
 # RUF001/RUF002: Cyrillic creator names / Russian prompt text use letters that
 #   resemble Latin — intentional, this pipeline ingests Russian-language clips.
-"scripts/backfill_durations.py" = ["S603", "S607", "S608"]
-"scripts/build_manifest.py" = ["S603", "S607"]
-"scripts/detect_cuts.py" = ["S603", "S607", "S608"]
-"scripts/factory.py" = ["S603", "S607", "S608"]
-"scripts/segment.py" = ["S608"]
-"scripts/segment_trial.py" = ["S603", "S607"]
-"scripts/transcribe_longform.py" = ["S603", "S607"]
-"scripts/process_full.py" = ["RUF001", "RUF002"]
-"scripts/rename_clips.py" = ["RUF001", "RUF002"]
+"src/approach_trainer/durations.py" = ["S603", "S607", "S608"]
+"src/approach_trainer/cuts.py" = ["S603", "S607", "S608"]
+"src/approach_trainer/factory.py" = ["S603", "S607", "S608"]
+"src/approach_trainer/segment.py" = ["S608"]
+"src/approach_trainer/retag.py" = ["S608"]
+"src/approach_trainer/names.py" = ["RUF001", "RUF002"]
 "src/approach_trainer/cli.py" = ["T201"]
 "src/approach_trainer/youtube.py" = ["S603", "T201"]
 
 [tool.ty.environment]
-# Scripts run in this project's uv environment. Mark scripts/ as a first-party
-# source root so sibling-module imports (e.g. `segment`) resolve without runtime
-# sys.path manipulation.
+# Pipeline modules live in the package and import each other normally.
 python = ".venv"
-root = ["src", "scripts"]
+root = ["src"]
 
 [tool.ty.rules]
 unused-ignore-comment = "error"

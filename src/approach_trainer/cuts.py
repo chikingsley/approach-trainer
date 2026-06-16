@@ -2,7 +2,7 @@
 the cut timestamps (JSON array of seconds) in the DB. Downscales to 320w for speed
 (cuts are global frame changes — detected fine at low res). Resumable: skips rows that
 already have cuts. Re-run anytime as new videos land.
-  uv run --project ~/github/approach-trainer scripts/detect_cuts.py
+  uv run --project ~/github/approach-trainer approach-trainer cuts
 """
 
 import json

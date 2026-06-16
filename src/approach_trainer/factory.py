@@ -9,9 +9,9 @@ Root decides the target table:
   /mnt/media/.../approach-clips/{ig,ru,yt,douyin}/<creator>/<id>.mp4 -> clips (id = stem)
 
 Usage:
-  uv run --project ~/github/approach-trainer scripts/factory.py <db>
-  uv run --project ~/github/approach-trainer scripts/factory.py <db> --path FILE ...
-  uv run --project ~/github/approach-trainer scripts/factory.py <db> --root DIR
+  uv run --project ~/github/approach-trainer approach-trainer factory <db>
+  uv run --project ~/github/approach-trainer approach-trainer factory <db> --path FILE ...
+  uv run --project ~/github/approach-trainer approach-trainer factory <db> --root DIR
 Resumable + idempotent: rows already present are skipped; safe to re-run anytime.
 """
 
@@ -30,13 +30,13 @@ from superwhisper_api.audio.formats import words_to_turns
 from superwhisper_api.languages import language_name, scribe_code, script_of
 from superwhisper_api.text.client import SuperwhisperClient
 
-from segment import ensure_outcome_columns, segment_one
+from approach_trainer.segment import ensure_outcome_columns, segment_one
 
 COURSES = Path("/mnt/media/pickup-courses")
 CLIPS_ROOT = Path("/mnt/media/gmk-server-share/approach-clips")
 CLIP_DIRS = ["ig", "ru", "yt", "douyin", "yt-intl"]
 AUD = CLIPS_ROOT / "factory-audio"
-APPROACH = Path(__file__).resolve().parents[1]
+APPROACH = Path(__file__).resolve().parents[2]
 THRESH = 0.3
 RUNS = 5
 def instruction_for(lang_name: str) -> str:

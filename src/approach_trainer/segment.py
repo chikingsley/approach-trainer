@@ -6,7 +6,7 @@ Continuous monologue/lecture rows get a single full-span segment with no LLM cal
 Dialogue-rich / multi-cut rows are sent to Sonnet for interaction boundaries.
 
 Run in the approach-trainer uv env:
-  uv run --project ~/github/approach-trainer scripts/segment.py <db> [--table sources|clips]
+  uv run --project ~/github/approach-trainer approach-trainer segment <db> [--table sources|clips]
     [--ids a,b,c] [--limit N] [--dry-run]
 """
 

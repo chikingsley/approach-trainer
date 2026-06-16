@@ -7,13 +7,13 @@ legacy `close` rows are mapped to commitment/contact provisionally and flagged
 (detail='review') for manual re-tag.
 
 Run AFTER the factory backlog finishes writing (so all rows are covered):
-  uv run --project ~/github/approach-trainer scripts/retag_outcomes.py <db>
+  uv run --project ~/github/approach-trainer approach-trainer retag <db>
 """
 
 import sqlite3
 import sys
 
-from segment import ensure_outcome_columns
+from approach_trainer.segment import ensure_outcome_columns
 
 # legacy outcome -> (meta, sub, detail)
 MAP = {
