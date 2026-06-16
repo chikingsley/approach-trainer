@@ -4,9 +4,19 @@ version = "0.1.0"
 description = "Approach-training media ingestion, transcription, and segmentation tooling."
 requires-python = ">=3.12,<3.13"
 dependencies = [
-    "omni-curator",
+    "omni-curator[youtube]",
     "superwhisper-api",
 ]
+
+[project.scripts]
+approach-trainer = "approach_trainer.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/approach_trainer"]
 
 [tool.uv.sources]
 omni-curator = { path = "../peacock-asr/packages/omni-curator", editable = true }
@@ -21,6 +31,7 @@ dev = [
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+src = ["src", "scripts"]
 
 # "ruff max": enable everything, then turn off only the genuinely impractical or
 # formatter-conflicting rules. Matches the peacock-asr package style used by these scripts.
@@ -63,13 +74,15 @@ ignore = [
 "scripts/transcribe_longform.py" = ["S603", "S607"]
 "scripts/process_full.py" = ["RUF001", "RUF002"]
 "scripts/rename_clips.py" = ["RUF001", "RUF002"]
+"src/approach_trainer/cli.py" = ["T201"]
+"src/approach_trainer/youtube.py" = ["S603", "T201"]
 
 [tool.ty.environment]
 # Scripts run in this project's uv environment. Mark scripts/ as a first-party
 # source root so sibling-module imports (e.g. `segment`) resolve without runtime
 # sys.path manipulation.
 python = ".venv"
-root = ["scripts"]
+root = ["src", "scripts"]
 
 [tool.ty.rules]
 unused-ignore-comment = "error"

@@ -1,5 +1,5 @@
-# Logs
-logs
+# Runtime logs
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -7,38 +7,50 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
+# Local secrets and browser/session exports
+.env
+.env.*
+!.env.example
+.instagram-cookies.txt
+*cookies*.txt
+
+# Local data stores and mounted data links
+data/
+
+# Heavy downloaded media; keep the small legacy manifest/transcript fixtures tracked.
+clips/raw/
+clips/frames/
+
+# Python / uv
+.venv/
+.python-version
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ruff_cache/
+.ty/
+.mypy_cache/
+.pyre/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Node / web leftovers from the earlier app scaffold
+node_modules/
+dist-ssr/
 *.local
 
-# Editor directories and files
+# Editor and OS files
 .vscode/*
 !.vscode/extensions.json
-.idea
+.idea/
 .DS_Store
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
-
-# downloaded clips — heavy media only; keep derived data (manifest, transcripts)
-clips/raw/
-clips/frames/
-
-# secrets
-.env
-.instagram-cookies.txt
-
-# generated data + python cache
-data/*.db
-data/*.db-wal
-data/*.db-shm
-data/**/*.db
-data/**/*.db-wal
-data/**/*.db-shm
-data/douyin/f2_douyin.yaml
-data/douyin/logs/
-**/__pycache__/
-*.pyc

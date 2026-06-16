@@ -26,10 +26,11 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from omni_curator.create.fuse import compile_down
-from segment import ensure_outcome_columns, segment_one
 from superwhisper_api.audio.formats import words_to_turns
 from superwhisper_api.languages import language_name, scribe_code, script_of
 from superwhisper_api.text.client import SuperwhisperClient
+
+from segment import ensure_outcome_columns, segment_one
 
 COURSES = Path("/mnt/media/pickup-courses")
 CLIPS_ROOT = Path("/mnt/media/gmk-server-share/approach-clips")

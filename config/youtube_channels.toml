@@ -1,0 +1,291 @@
+[settings]
+media_root = "/mnt/media/gmk-server-share/approach-clips"
+format = "bv*[height<=1920]+ba/b[height<=1920]/b"
+player_client = "web_safari"
+factory_trigger = "/home/simon/github/approach-trainer/scripts/factory_trigger.sh"
+
+[profiles.kasm_profile_1]
+browser = "chrome"
+path = "/home/simon/docker/kasm/chrome-home/.config/google-chrome/Profile 1"
+lock = "/tmp/approach-youtube-kasm-profile-1.lock"
+sleep_requests = 2.0
+sleep_interval = 3.0
+
+[profiles.kasm_default]
+browser = "chrome"
+path = "/home/simon/docker/kasm/chrome-home/.config/google-chrome/Default"
+lock = "/tmp/approach-youtube-kasm-default.lock"
+sleep_requests = 2.0
+sleep_interval = 3.0
+
+[[channels]]
+slug = "stanis"
+url = "https://www.youtube.com/@stanis_1204/shorts"
+group = "yt"
+language = "eng"
+profile = "kasm_profile_1"
+note = "shorts"
+
+[[channels]]
+slug = "vladradu-shorts"
+url = "https://www.youtube.com/@vladradu1/shorts"
+group = "yt"
+language = "eng"
+profile = "kasm_profile_1"
+note = "shorts"
+
+[[channels]]
+slug = "vladradu-videos"
+url = "https://www.youtube.com/@vladradu1/videos"
+group = "yt"
+language = "eng"
+profile = "kasm_profile_1"
+note = "videos"
+
+[[channels]]
+slug = "tlizamm"
+url = "https://www.youtube.com/@tlizamm/shorts"
+group = "yt"
+language = "eng"
+profile = "kasm_profile_1"
+note = "shorts"
+
+[[channels]]
+slug = "nstv-shorts"
+url = "https://www.youtube.com/@nstv69/shorts"
+group = "yt"
+language = "eng"
+profile = "kasm_profile_1"
+note = "shorts"
+
+[[channels]]
+slug = "nstv-videos"
+url = "https://www.youtube.com/@nstv69/videos"
+group = "yt"
+language = "eng"
+profile = "kasm_profile_1"
+note = "videos"
+
+[[channels]]
+slug = "benseda-shorts"
+url = "https://www.youtube.com/@realbenjaminseda/shorts"
+group = "yt"
+language = "eng"
+profile = "kasm_profile_1"
+note = "shorts"
+
+[[channels]]
+slug = "benseda-videos"
+url = "https://www.youtube.com/@realbenjaminseda/videos"
+group = "yt"
+language = "eng"
+profile = "kasm_profile_1"
+note = "videos"
+
+[[channels]]
+slug = "socialanimal"
+url = "https://www.youtube.com/@socialanimal/videos"
+group = "yt"
+language = "eng"
+profile = "kasm_profile_1"
+note = "videos"
+
+[[channels]]
+slug = "sergio-sorokin"
+url = "https://www.youtube.com/@sergiosorokin/videos"
+group = "yt"
+language = "eng"
+profile = "kasm_profile_1"
+note = "full videos"
+
+[[channels]]
+slug = "es-alvaroreyes-videos"
+url = "https://www.youtube.com/@alvarodaygame/videos"
+group = "yt-intl"
+language = "spa"
+profile = "kasm_profile_1"
+note = "videos"
+
+[[channels]]
+slug = "es-alvaroreyes-shorts"
+url = "https://www.youtube.com/@alvarodaygame/shorts"
+group = "yt-intl"
+language = "spa"
+profile = "kasm_profile_1"
+note = "shorts"
+
+[[channels]]
+slug = "es-adrianbravo-videos"
+url = "https://www.youtube.com/@AdrianBravo/videos"
+group = "yt-intl"
+language = "spa"
+profile = "kasm_profile_1"
+note = "videos"
+
+[[channels]]
+slug = "es-adrianbravo-shorts"
+url = "https://www.youtube.com/@AdrianBravo/shorts"
+group = "yt-intl"
+language = "spa"
+profile = "kasm_profile_1"
+note = "shorts"
+
+[[channels]]
+slug = "es-seduccionperu-videos"
+url = "https://www.youtube.com/@SeduccionPeru/videos"
+group = "yt-intl"
+language = "spa"
+profile = "kasm_profile_1"
+note = "videos"
+
+[[channels]]
+slug = "es-seduccionperu-shorts"
+url = "https://www.youtube.com/@SeduccionPeru/shorts"
+group = "yt-intl"
+language = "spa"
+profile = "kasm_profile_1"
+note = "shorts"
+
+[[channels]]
+slug = "fr-fabricejulien-videos"
+url = "https://www.youtube.com/channel/UCP5yyxM2OM8b9f2KrOAbWnw/videos"
+group = "yt-intl"
+language = "fra"
+profile = "kasm_profile_1"
+note = "videos"
+
+[[channels]]
+slug = "fr-fabricejulien-shorts"
+url = "https://www.youtube.com/channel/UCP5yyxM2OM8b9f2KrOAbWnw/shorts"
+group = "yt-intl"
+language = "fra"
+profile = "kasm_profile_1"
+note = "shorts"
+
+[[channels]]
+slug = "fr-clementrodriguez-videos"
+url = "https://www.youtube.com/channel/UC6O0lDfMTGGkap-AsSScj9w/videos"
+group = "yt-intl"
+language = "fra"
+profile = "kasm_profile_1"
+note = "videos"
+
+[[channels]]
+slug = "fr-clementrodriguez-shorts"
+url = "https://www.youtube.com/channel/UC6O0lDfMTGGkap-AsSScj9w/shorts"
+group = "yt-intl"
+language = "fra"
+profile = "kasm_profile_1"
+note = "shorts"
+
+[[channels]]
+slug = "fr-dragueurdeparis-videos"
+url = "https://www.youtube.com/channel/UCFoJeNmQDRRXWsR59AxJpsQ/videos"
+group = "yt-intl"
+language = "fra"
+profile = "kasm_profile_1"
+note = "videos"
+
+[[channels]]
+slug = "fr-dragueurdeparis-shorts"
+url = "https://www.youtube.com/channel/UCFoJeNmQDRRXWsR59AxJpsQ/shorts"
+group = "yt-intl"
+language = "fra"
+profile = "kasm_profile_1"
+note = "shorts"
+
+[[channels]]
+slug = "zh-chris-videos"
+url = "https://www.youtube.com/channel/UCF9qiA5T-QH8kVA0t_Vhluw/videos"
+group = "yt-intl"
+language = "zho"
+profile = "kasm_profile_1"
+note = "videos"
+
+[[channels]]
+slug = "zh-chris-shorts"
+url = "https://www.youtube.com/channel/UCF9qiA5T-QH8kVA0t_Vhluw/shorts"
+group = "yt-intl"
+language = "zho"
+profile = "kasm_profile_1"
+note = "shorts"
+
+[[channels]]
+slug = "zh-mikey-videos"
+url = "https://www.youtube.com/@pick-up_Mikey/videos"
+group = "yt-intl"
+language = "zho"
+profile = "kasm_profile_1"
+note = "videos"
+
+[[channels]]
+slug = "zh-mikey-shorts"
+url = "https://www.youtube.com/@pick-up_Mikey/shorts"
+group = "yt-intl"
+language = "zho"
+profile = "kasm_profile_1"
+note = "shorts"
+
+[[channels]]
+slug = "zh-ryan-videos"
+url = "https://www.youtube.com/channel/UCpDr5JQrC7lX-VKq2AXm-5g/videos"
+group = "yt-intl"
+language = "zho"
+profile = "kasm_profile_1"
+note = "videos"
+
+[[channels]]
+slug = "zh-ryan-shorts"
+url = "https://www.youtube.com/channel/UCpDr5JQrC7lX-VKq2AXm-5g/shorts"
+group = "yt-intl"
+language = "zho"
+profile = "kasm_profile_1"
+note = "shorts"
+
+[[channels]]
+slug = "de-flirtprofis-videos"
+url = "https://www.youtube.com/channel/UCJL3zoFiQW0wOT4-e56R2VQ/videos"
+group = "yt-intl"
+language = "deu"
+profile = "kasm_profile_1"
+note = "videos"
+
+[[channels]]
+slug = "de-flirtprofis-shorts"
+url = "https://www.youtube.com/channel/UCJL3zoFiQW0wOT4-e56R2VQ/shorts"
+group = "yt-intl"
+language = "deu"
+profile = "kasm_profile_1"
+note = "shorts"
+
+[[channels]]
+slug = "de-abdel-videos"
+url = "https://www.youtube.com/channel/UCBkQzss2PPoiYVS8iuMCT_g/videos"
+group = "yt-intl"
+language = "deu"
+profile = "kasm_profile_1"
+note = "videos"
+
+[[channels]]
+slug = "de-abdel-shorts"
+url = "https://www.youtube.com/channel/UCBkQzss2PPoiYVS8iuMCT_g/shorts"
+group = "yt-intl"
+language = "deu"
+profile = "kasm_profile_1"
+note = "shorts"
+
+[[channels]]
+slug = "de-flirtempire-videos"
+url = "https://www.youtube.com/c/FlirtEmpire/videos"
+group = "yt-intl"
+language = "deu"
+profile = "kasm_profile_1"
+note = "videos"
+
+[[channels]]
+slug = "de-flirtempire-shorts"
+url = "https://www.youtube.com/c/FlirtEmpire/shorts"
+group = "yt-intl"
+language = "deu"
+profile = "kasm_profile_1"
+note = "shorts"
