@@ -2,6 +2,18 @@
 media_root = "/mnt/media/gmk-server-share/approach-clips"
 format = "bv*[height<=1920]+ba/b[height<=1920]/b"
 player_client = "web_safari"
+default_lane = "residential"
+
+# Egress lanes. "direct" = host residential IP + a browser cookie profile.
+# A container name = borrow that container's network namespace (VPN), run anonymous.
+# Add more vpn lanes (vpn2 -> a second gluetun) as more AirVPN configs come online.
+[lanes.residential]
+egress = "direct"
+profile = "kasm_profile_1"
+
+[lanes.vpn1]
+egress = "gluetun"
+anonymous = true
 
 [profiles.kasm_profile_1]
 browser = "chrome"

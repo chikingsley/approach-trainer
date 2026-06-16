@@ -63,7 +63,7 @@ def main(argv: list[str] | None = None) -> int:
     download_parser.add_argument("--channel", help="one channel slug")
     download_parser.add_argument("--group", help="all channels in a group")
     download_parser.add_argument("--language", help="all channels with an ISO-639-3 language")
-    download_parser.add_argument("--profile", help="override configured browser profile")
+    download_parser.add_argument("--lane", help="egress lane (default = registry default_lane)")
     download_parser.add_argument("--limit", type=int, help="playlist cap per selected channel")
     download_parser.add_argument("--dry-run", action="store_true")
     download_parser.add_argument("--no-factory", action="store_true")
@@ -118,7 +118,7 @@ def _cmd_download(registry: YoutubeRegistry, args: argparse.Namespace) -> int:
     results = download_channels(
         registry,
         channels,
-        profile_override=args.profile,
+        lane=args.lane,
         limit=args.limit,
         dry_run=args.dry_run,
         run_factory=not args.no_factory,
