@@ -13,7 +13,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
-from superwhisper_api.text.client import SuperwhisperClient
+from approach_trainer.swservice import SuperwhisperClient
 
 WORKERS = 64
 APPROACHER = "speaker_0"
@@ -58,11 +58,11 @@ def get_names(
     for _ in range(2):
         try:
             r = client().generate(
-                "claude-sonnet-4-6",
                 [{"role": "user", "content": prompt}],
+                model="claude-sonnet-4-6",
                 max_tokens=200,
             )
-            data = parse_lenient(r.text)
+            data = parse_lenient(r)
             if data:
                 return {
                     str(k): str(v)

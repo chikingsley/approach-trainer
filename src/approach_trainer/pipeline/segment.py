@@ -15,8 +15,9 @@ import json
 import sqlite3
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import cast
 
-from superwhisper_api.text.client import SuperwhisperClient
+from approach_trainer.swservice import SuperwhisperClient
 
 MODEL = "claude-sonnet-4-6"
 WORKERS = 16
@@ -128,9 +129,21 @@ def segment_one(turns: list[dict], cuts: list, duration: float) -> list[dict]:
                  "outcome_sub": "na", "outcome_detail": "",
                  "summary": "(single full-span segment)"}]
     msg = PROMPT.format(cuts=cuts, turns=turns_block(turns))
-    res = client().generate_json(MODEL, [{"role": "user", "content": msg}],
-                                 schema=SCHEMA, max_tokens=8000)
-    return res.get("segments", []) if isinstance(res, dict) else []
+    response_format: dict[str, object] = {
+        "type": "json_schema",
+        "json_schema": {"name": "structured_response", "strict": True, "schema": SCHEMA},
+    }
+    res = client().generate_json(
+        [{"role": "user", "content": msg}],
+        model=MODEL,
+        response_format=response_format,
+        max_tokens=8000,
+    )
+    if isinstance(res, dict):
+        segments = res.get("segments", [])
+        if isinstance(segments, list):
+            return cast("list[dict]", segments)
+    return []
 
 
 def main() -> None:

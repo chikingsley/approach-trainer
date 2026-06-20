@@ -13,8 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
-from superwhisper_api.languages import resolve
-
+from approach_trainer.languages import resolve
 from approach_trainer.paths import (
     DATA_DIR,
     DEFAULT_DB,

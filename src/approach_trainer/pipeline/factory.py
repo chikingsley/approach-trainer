@@ -25,19 +25,18 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from omni_curator.create.fuse import compile_down
-from superwhisper_api.audio.formats import words_to_turns
-from superwhisper_api.languages import language_name, scribe_code, script_of
-from superwhisper_api.text.client import SuperwhisperClient
+from omni_curator.swservice import SuperwhisperClient
 
-from approach_trainer.paths import AUDIO_CACHE, CLIPS_ROOT, COURSES_ROOT, PROJECT_ROOT
+from approach_trainer.languages import language_name, scribe_code, script_of
+from approach_trainer.paths import AUDIO_CACHE, CLIPS_ROOT, COURSES_ROOT
 from approach_trainer.pipeline.audio import drop_cache, extract_audio, fid_of
 from approach_trainer.pipeline.cuts import detect_cuts
 from approach_trainer.pipeline.segment import ensure_outcome_columns, segment_one
+from approach_trainer.swservice import transcribe_file
 
 COURSES = COURSES_ROOT
 CLIP_DIRS = ["ig", "yt", "douyin"]
 AUD = AUDIO_CACHE
-APPROACH = PROJECT_ROOT
 RUNS = 5
 
 
@@ -65,27 +64,34 @@ def probe_duration(path: str) -> float:
 
 def batch_scribe(flacs: list[Path], scribe_code: str, tag: str,
                  max_workers: int = 200) -> dict[str, list[dict]]:
-    """Run RUNS diarized Scribe passes over ALL flacs at once (one process per pass,
-    high internal concurrency). Returns {flac_stem (= fid): [records across runs]}."""
-    paths_file = AUD / f"backlog_{tag}.paths.txt"
-    paths_file.write_text("\n".join(str(f) for f in flacs))
+    """Run RUNS diarized Scribe passes over ALL flacs via the deployed ASR service.
+
+    Each pass submits every flac to ``transcribe_file`` (diarized, ``detail=["turns"]``)
+    concurrently; ``RUNS`` passes give the ensemble its repeated hypotheses. Returns
+    {flac_stem (= fid): [result dicts across runs]}, each result carrying ``transcript``
+    and diarized ``turns``. The service owns ASR key rotation, so no keys are handled here.
+    """
     by_fid: dict[str, list[dict]] = {}
+    pool_size = min(max_workers, max(1, len(flacs)))
+
+    def one(flac: Path) -> tuple[str, dict | None]:
+        try:
+            result = transcribe_file(
+                flac, asr_model="scribe-v2", mode="single",
+                language=scribe_code, diarize=True, detail=["turns"],
+            )
+        # Resilience: a failed clip must not abort the whole backlog pass.
+        except Exception as e:  # noqa: BLE001
+            print(f"  scribe FAIL {flac.stem} ({tag}): {e}", flush=True)
+            return flac.stem, None
+        return flac.stem, result
+
     for r in range(RUNS):
-        out = AUD / f"backlog_{tag}.run{r}.jsonl"
-        subprocess.run(
-            ["uv", "run", "--project", str(APPROACH), "superwhisper-audio",
-             "--paths-file", str(paths_file),
-             "--jsonl", str(out), "--diarize", "--language", scribe_code,
-             "--max-workers", str(max_workers)],
-            check=False,
-        )
-        if out.exists():
-            for line in out.read_text().splitlines():
-                if not line.strip():
-                    continue
-                rec = json.loads(line)
-                if rec.get("transcript") or not rec.get("error"):
-                    by_fid.setdefault(Path(rec["audio_path"]).stem, []).append(rec)
+        print(f"  pass {r + 1}/{RUNS} ({tag}): {len(flacs)} files...", flush=True)
+        with ThreadPoolExecutor(max_workers=pool_size) as pool:
+            for fid, result in pool.map(one, flacs):
+                if result is not None and (result.get("transcript") or result.get("turns")):
+                    by_fid.setdefault(fid, []).append(result)
     return by_fid
 
 
@@ -101,7 +107,7 @@ def target_for(v: Path) -> tuple[str, dict] | None:
         if base in v.parents:
             rel = v.relative_to(base)
             if d == "yt":
-                # yt/<lang>/<creator>/<id>.mp4 — lang resolves via superwhisper_api.languages
+                # yt/<lang>/<creator>/<id>.mp4 — lang resolves via approach_trainer.languages
                 lang = rel.parts[0]
                 creator = rel.parts[1] if len(rel.parts) > 1 else rel.parts[0]
                 return "clips", {"creator": creator, "source": "youtube", "lang": lang}
@@ -117,6 +123,23 @@ def already_done(db: sqlite3.Connection, table: str, v: Path) -> bool:
     return db.execute(f"SELECT 1 FROM {table} WHERE id=?", (cid,)).fetchone() is not None
 
 
+def _speaker_id(label: object) -> str:
+    """Map a service ``"Speaker N"`` turn label to the legacy 0-indexed ``speaker_{N-1}`` id.
+
+    The deployed ASR service emits diarized turn speakers as ``"Speaker 1"``, ``"Speaker 2"``,
+    … (1-indexed, sorted by raw provider id). The rest of this pipeline keys on the old
+    ``speaker_0``/``speaker_1`` ids (``speaker_0`` = approacher), so re-base to 0-indexed.
+    Anything unparseable falls back to ``speaker_0``.
+    """
+    text = str(label or "").strip()
+    if text.lower().startswith("speaker"):
+        digits = "".join(ch for ch in text if ch.isdigit())
+        if digits:
+            n = int(digits)
+            return f"speaker_{n - 1}" if "speaker " in text.lower() else f"speaker_{n}"
+    return "speaker_0"
+
+
 def finalize_one(db: sqlite3.Connection, client: SuperwhisperClient, v: Path,
                  table: str, extra: dict, recs: list[dict]) -> str:
     """Given the Scribe records for one video, compile consensus, write the parent
@@ -128,8 +151,6 @@ def finalize_one(db: sqlite3.Connection, client: SuperwhisperClient, v: Path,
     cuts = detect_cuts(str(v)) or []
     duration = probe_duration(str(v))
     variants = [r.get("transcript", "").strip() for r in recs if r.get("transcript")]
-    best = max(recs, key=lambda r: len(r.get("raw_response", {}).get("words", [])), default={})
-    words = best.get("raw_response", {}).get("words", [])
     transcript = ""
     if variants:
         for _ in range(3):
@@ -141,9 +162,16 @@ def finalize_one(db: sqlite3.Connection, client: SuperwhisperClient, v: Path,
             # on this clip without aborting the whole batch.
             except Exception:  # noqa: BLE001, S112
                 continue
-    turns = [{"speaker": t.speaker, "text": t.text.strip(),
-              "start": round(t.start, 2), "end": round(t.end, 2)} for t in words_to_turns(words)]
-    speakers = sorted({w.get("speaker_id") for w in words if w.get("type") == "word"})
+    # Use the richest run's diarized turns from the service (it serializes "Speaker N"
+    # labels). Normalize to the legacy 0-indexed `speaker_N` ids the rest of the pipeline
+    # expects (speaker_0 = approacher; consumed by segment + speaker_identity).
+    best = max(recs, key=lambda r: len(r.get("turns") or []), default={})
+    turns = [
+        {"speaker": _speaker_id(t.get("speaker")), "text": str(t.get("text", "")).strip(),
+         "start": round(float(t.get("start", 0.0)), 2), "end": round(float(t.get("end", 0.0)), 2)}
+        for t in (best.get("turns") or [])
+    ]
+    speakers = sorted({t["speaker"] for t in turns})
 
     if table == "sources":
         db.execute(

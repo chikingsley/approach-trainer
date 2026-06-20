@@ -5,7 +5,6 @@ description = "Approach-training media ingestion, transcription, and segmentatio
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "omni-curator[youtube]",
-    "superwhisper-api",
     "gallery-dl",
 ]
 
@@ -21,7 +20,6 @@ packages = ["src/approach_trainer"]
 
 [tool.uv.sources]
 omni-curator = { path = "../peacock-asr/packages/omni-curator", editable = true }
-superwhisper-api = { path = "../peacock-asr/packages/superwhisper-api", editable = true }
 
 [dependency-groups]
 dev = [
