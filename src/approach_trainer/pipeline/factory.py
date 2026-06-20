@@ -78,7 +78,7 @@ def batch_scribe(flacs: list[Path], scribe_code: str, tag: str,
         try:
             result = transcribe_file(
                 flac, asr_model="scribe-v2", mode="single",
-                language=scribe_code, diarize=True, detail=["turns"],
+                language=scribe_code, diarize=True, detail=["turns"], timestamps=True,
             )
         # Resilience: a failed clip must not abort the whole backlog pass.
         except Exception as e:  # noqa: BLE001

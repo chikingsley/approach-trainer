@@ -184,6 +184,7 @@ def transcribe_file(
     language: str | None = None,
     diarize: bool = False,
     detail: Sequence[str] | None = None,
+    timestamps: bool = False,
     workers: int | None = None,
     poll_interval: float = _ASR_POLL_INTERVAL,
     poll_timeout: float = _ASR_POLL_TIMEOUT,
@@ -211,6 +212,8 @@ def transcribe_file(
         payload["diarize"] = True
     if detail is not None:
         payload["detail"] = list(detail)
+    if timestamps:
+        payload["timestamps"] = True
     if workers is not None:
         payload["workers"] = workers
 
