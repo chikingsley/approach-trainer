@@ -174,13 +174,11 @@ def transcribe_file(
     path: str | Path,
     *,
     asr_model: str = "scribe-v2",
-    mode: str = "single",  # noqa: ARG001  # accepted for back-compat; consensus now lives at /v1/transcriptions/consensus
     language: str | None = None,
     diarize: bool = False,
     detail: Sequence[str] | None = None,
     timestamps: bool = False,
     formats: Sequence[str] | None = None,
-    workers: int | None = None,  # noqa: ARG001  # accepted for back-compat; the sync endpoint has no worker fan-out
 ) -> dict[str, object]:
     """Transcribe one local audio file through the deployed ASR service; return its result.
 
