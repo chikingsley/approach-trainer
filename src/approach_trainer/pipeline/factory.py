@@ -1,7 +1,7 @@
 """Factory: turn a raw video into fully-processed DB rows in one chain.
 
 For each NEW video (not yet in the DB) it runs:
-  detect cuts -> extract audio -> 5x diarized Scribe -> compile-down consensus
+  detect cuts -> extract audio -> 5x diarized Scribe -> consensus fuse
   -> write parent row (sources|clips) -> cut-aware segmentation -> write child segments.
 
 Root decides the target table:
@@ -24,7 +24,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-from omni_curator.create.fuse import compile_down
+from omni_curator.create.fuse import consensus_fuse
 from omni_curator.swservice import SuperwhisperClient
 
 from approach_trainer.languages import language_name, scribe_code, script_of
@@ -142,7 +142,7 @@ def _speaker_id(label: object) -> str:
 
 def finalize_one(db: sqlite3.Connection, client: SuperwhisperClient, v: Path,
                  table: str, extra: dict, recs: list[dict]) -> str:
-    """Given the Scribe records for one video, compile consensus, write the parent
+    """Given the Scribe records for one video, build consensus, write the parent
     row, segment, and write child rows. (Scribe already done in batch.)"""
     cid = fid_of(v) if table == "sources" else v.stem
     lang = extra.get("lang", "en")
@@ -155,7 +155,7 @@ def finalize_one(db: sqlite3.Connection, client: SuperwhisperClient, v: Path,
     if variants:
         for _ in range(3):
             try:
-                transcript = compile_down(variants, language=lang_name, script=script,
+                transcript = consensus_fuse(variants, language=lang_name, script=script,
                                           client=client, instruction=instruction_for(lang_name))
                 break
             # Resilience: retry a transient LLM/network failure up to 3x, then give up

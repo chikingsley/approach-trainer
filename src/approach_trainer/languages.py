@@ -148,7 +148,7 @@ def scribe_code(query: str) -> str:
 
 
 def language_name(query: str) -> str:
-    """English language name (for compile_down's ``language=``)."""
+    """English language name (for consensus_fuse's ``language=``)."""
     return resolve(query).name
 
 
