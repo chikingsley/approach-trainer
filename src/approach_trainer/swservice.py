@@ -10,9 +10,9 @@ Two surfaces:
 - :class:`SuperwhisperClient` — text/LLM generation (``generate`` / ``generate_json``),
   mirroring jobkit / omni-curator's client so the segment / speaker / fuse call sites keep
   their shape. ``messages`` is first; ``model`` is a keyword. ``generate`` returns a ``str``.
-- :func:`transcribe_file` — submit one audio file to the async ASR endpoint and poll to
-  completion, returning the job ``result`` dict (read ``result["transcript"]`` and, when
-  ``detail`` is requested, ``result["words"]`` / ``result["turns"]``).
+- :func:`transcribe_file` — post one audio file to the synchronous ASR endpoint and
+  return the result dict inline (read ``result["transcript"]`` and, when ``detail`` is
+  requested, ``result["words"]`` / ``result["turns"]``).
 
 Config comes from the environment (or the nearest ``.env`` walking up from this file):
 ``SUPERWHISPER_API_BASE`` (e.g. ``https://superwhisper.peacockery.studio``) and
@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import json
 import os
-import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Self
 
@@ -36,12 +35,7 @@ if TYPE_CHECKING:
 MODEL_ID = "claude-sonnet-4-6"
 _GENERATE_PATH = "/v1/text/generate"
 _TRANSCRIBE_PATH = "/v1/transcriptions"
-_JOB_PATH = "/v1/jobs"
 _TIMEOUT = 120.0
-#: How long to keep polling a submitted ASR job before giving up.
-_ASR_POLL_TIMEOUT = 1800.0
-#: Seconds between ASR job-status polls.
-_ASR_POLL_INTERVAL = 2.0
 
 
 def parse_json_text(text: str) -> object:
@@ -180,31 +174,30 @@ def transcribe_file(
     path: str | Path,
     *,
     asr_model: str = "scribe-v2",
-    mode: str = "single",
+    mode: str = "single",  # noqa: ARG001  # accepted for back-compat; consensus now lives at /v1/transcriptions/consensus
     language: str | None = None,
     diarize: bool = False,
     detail: Sequence[str] | None = None,
     timestamps: bool = False,
-    workers: int | None = None,
-    poll_interval: float = _ASR_POLL_INTERVAL,
-    poll_timeout: float = _ASR_POLL_TIMEOUT,
+    formats: Sequence[str] | None = None,
+    workers: int | None = None,  # noqa: ARG001  # accepted for back-compat; the sync endpoint has no worker fan-out
 ) -> dict[str, object]:
-    """Transcribe one local audio file through the deployed ASR service; return its ``result``.
+    """Transcribe one local audio file through the deployed ASR service; return its result.
 
-    Submits ``path`` (resolved to an absolute path the service can read off its read-only
-    ``/home/simon`` + ``/mnt`` mounts) to ``POST /v1/transcriptions`` and polls
-    ``GET /v1/jobs/{job_id}`` until the job succeeds. Returns the job ``result`` dict, so the
-    caller reads ``result["transcript"]`` (and ``result["words"]`` / ``result["turns"]`` when
-    ``detail`` is requested). ``mode`` is ``"single"`` (one pass) or ``"consensus"`` (ensemble
-    + fuse). ``language=None`` lets the service auto-detect / code-switch.
+    Posts ``path`` (resolved to an absolute path the service can read off its read-only
+    ``/home/simon`` + ``/mnt`` mounts) to the synchronous ``POST /v1/transcriptions`` and
+    returns the result dict inline (no job / no poll). The caller reads
+    ``result["transcript"]`` (and ``result["words"]`` / ``result["turns"]`` when ``detail`` is
+    requested). ``language=None`` lets the service auto-detect / code-switch.
+    ``timestamps=True`` makes the returned ``words`` (and ``turns``) carry ``start`` / ``end``
+    offsets.
 
-    Raises :class:`RuntimeError` if the job fails or does not finish within ``poll_timeout``.
-    The service owns ASR key rotation, so there is no key handling here.
+    Raises for any non-2xx response. The service owns ASR key rotation, so there is no key
+    handling here.
     """
     payload: dict[str, object] = {
         "input": str(Path(path).resolve()),
         "asr_model": asr_model,
-        "mode": mode,
     }
     if language is not None:
         payload["language"] = language
@@ -214,39 +207,10 @@ def transcribe_file(
         payload["detail"] = list(detail)
     if timestamps:
         payload["timestamps"] = True
-    if workers is not None:
-        payload["workers"] = workers
+    if formats is not None:
+        payload["formats"] = list(formats)
 
     with _make_client() as client:
-        submit = client.post(_TRANSCRIBE_PATH, json=payload)
-        submit.raise_for_status()
-        job_id = str(submit.json()["job_id"])
-        return _poll_job(client, job_id, interval=poll_interval, timeout=poll_timeout)
-
-
-def _poll_job(
-    client: httpx.Client, job_id: str, *, interval: float, timeout: float
-) -> dict[str, object]:
-    """Poll ``GET /v1/jobs/{job_id}`` until it succeeds; raise on failure or timeout."""
-    deadline = time.monotonic() + timeout
-    while True:
-        response = client.get(f"{_JOB_PATH}/{job_id}")
+        response = client.post(_TRANSCRIBE_PATH, json=payload)
         response.raise_for_status()
-        body = response.json()
-        status = body.get("status")
-        if status == "succeeded":
-            result = body.get("result")
-            if not isinstance(result, dict):
-                msg = f"job {job_id} succeeded but returned no result"
-                raise RuntimeError(msg)
-            return result
-        if status == "failed":
-            msg = f"transcription job {job_id} failed: {body.get('error')}"
-            raise RuntimeError(msg)
-        if time.monotonic() >= deadline:
-            msg = (
-                f"transcription job {job_id} did not finish within "
-                f"{timeout:.0f}s (status={status})"
-            )
-            raise RuntimeError(msg)
-        time.sleep(interval)
+        return dict(response.json())
