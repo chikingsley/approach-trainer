@@ -9,6 +9,7 @@ from pathlib import Path
 
 from approach_trainer.ingest.youtube import (
     YoutubeRegistry,
+    backfill_metadata,
     download_channels,
     load_registry,
     refresh_cookies,
@@ -69,6 +70,17 @@ def main(argv: list[str] | None = None) -> int:
     download_parser.add_argument("--no-factory", action="store_true")
     download_parser.set_defaults(func=_cmd_download)
 
+    metadata_parser = youtube_sub.add_parser(
+        "backfill-metadata",
+        help="write missing yt-dlp .info.json sidecars for downloaded YouTube clips",
+    )
+    metadata_parser.add_argument("--db", type=Path)
+    metadata_parser.add_argument("--lane", help="egress lane (default = registry default_lane)")
+    metadata_parser.add_argument("--limit", type=int)
+    metadata_parser.add_argument("--batch-size", type=int, default=25)
+    metadata_parser.add_argument("--dry-run", action="store_true")
+    metadata_parser.set_defaults(func=_cmd_backfill_metadata)
+
     list_parser.set_defaults(func=_cmd_list)
 
     for step in PIPELINE_STEPS:
@@ -125,6 +137,23 @@ def _cmd_download(registry: YoutubeRegistry, args: argparse.Namespace) -> int:
     )
     for result in results:
         print(f"{result.channel.slug:28s} {result.media_count:5d} file(s) -> {result.out_dir}")
+    return 0
+
+
+def _cmd_backfill_metadata(registry: YoutubeRegistry, args: argparse.Namespace) -> int:
+    result = backfill_metadata(
+        registry,
+        db_path=args.db if args.db is not None else Path("data/clips.db"),
+        lane=args.lane,
+        limit=args.limit,
+        batch_size=args.batch_size,
+        dry_run=args.dry_run,
+    )
+    print(
+        "metadata backfill done: "
+        f"selected={result.selected} skipped={result.skipped} "
+        f"attempted={result.attempted} sidecars={result.sidecars}"
+    )
     return 0
 
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import fcntl
 import os
 import shlex
+import sqlite3
 import subprocess
 import sys
 import tomllib
@@ -107,6 +108,29 @@ class DownloadResult:
     media_count: int
 
 
+@dataclass(frozen=True, slots=True)
+class MetadataBackfillResult:
+    """Summary of a yt-dlp info-json backfill pass."""
+
+    selected: int
+    skipped: int
+    attempted: int
+    sidecars: int
+
+
+@dataclass(frozen=True, slots=True)
+class MetadataTarget:
+    """One YouTube DB clip whose yt-dlp metadata can be backfilled."""
+
+    video_id: str
+    out_dir: Path
+    info_path: Path
+
+    @property
+    def url(self) -> str:
+        return f"https://www.youtube.com/watch?v={self.video_id}"
+
+
 def load_registry(path: Path = DEFAULT_YOUTUBE_CONFIG) -> YoutubeRegistry:
     raw = tomllib.loads(path.read_text(encoding="utf-8"))
     settings = _mapping(raw.get("settings", {}), "settings")
@@ -201,6 +225,7 @@ def download_channel(
         "-f", registry.video_format,
         "--fragment-retries", "5",
         "--download-archive", str(out_dir / "archive.txt"),
+        "--lazy-playlist",  # download as the channel is listed, not after — files land immediately
         "--sleep-requests", sleep_req, "--sleep-interval", sleep_int,
         "--ignore-errors",
         "-o", str(out_dir / "%(id)s.%(ext)s"),
@@ -221,6 +246,58 @@ def download_channel(
     else:
         subprocess.run(cmd, check=False)
     return DownloadResult(channel=channel, out_dir=out_dir, media_count=count_media(out_dir))
+
+
+def backfill_metadata(
+    registry: YoutubeRegistry,
+    *,
+    db_path: Path = DEFAULT_DB,
+    lane: str | None = None,
+    limit: int | None = None,
+    batch_size: int = 25,
+    dry_run: bool = False,
+) -> MetadataBackfillResult:
+    """Write missing ``<youtube-id>.info.json`` sidecars for DB-backed YouTube clips."""
+    lane_obj = registry.lanes[lane or registry.default_lane]
+    selected = skipped = attempted = sidecars = 0
+    batch: list[MetadataTarget] = []
+    print(f"metadata backfill scanning {db_path}", flush=True)
+    for target in _metadata_targets(db_path, registry.media_root, limit=limit):
+        selected += 1
+        if target.info_path.exists():
+            skipped += 1
+            sidecars += 1
+            continue
+        if dry_run:
+            print(f"{target.info_path} <- {target.url}")
+            continue
+        batch.append(target)
+        if len(batch) < batch_size:
+            continue
+        attempted += _backfill_one_batch(registry, lane_obj, batch)
+        sidecars += sum(1 for item in batch if item.info_path.exists())
+        print(
+            f"metadata backfill: selected={selected} skipped={skipped} "
+            f"attempted={attempted} sidecars={sidecars}",
+            flush=True,
+        )
+        batch = []
+
+    if batch and not dry_run:
+        attempted += _backfill_one_batch(registry, lane_obj, batch)
+        sidecars += sum(1 for item in batch if item.info_path.exists())
+        print(
+            f"metadata backfill: selected={selected} skipped={skipped} "
+            f"attempted={attempted} sidecars={sidecars}",
+            flush=True,
+        )
+
+    return MetadataBackfillResult(
+        selected=selected,
+        skipped=skipped,
+        attempted=attempted,
+        sidecars=sidecars,
+    )
 
 
 def refresh_cookies(profile: BrowserProfile, out_path: Path | None = None) -> tuple[Path, int]:
@@ -258,6 +335,112 @@ def count_media(path: Path) -> int:
         for child in path.iterdir()
         if child.is_file() and child.suffix.lower() in VIDEO_SUFFIXES
     )
+
+
+def _metadata_targets(
+    db_path: Path,
+    media_root: Path,
+    *,
+    limit: int | None,
+) -> Iterator[MetadataTarget]:
+    query = (
+        "SELECT id, file_path FROM clips "
+        "WHERE source = 'youtube' AND file_path IS NOT NULL "
+        "ORDER BY lang, creator, id"
+    )
+    params: list[Any] = []
+    if limit is not None:
+        query += " LIMIT ?"
+        params.append(limit)
+    with sqlite3.connect(db_path) as db:
+        for video_id, raw_path in db.execute(query, params):
+            path = _current_media_path(Path(str(raw_path)), media_root)
+            out_dir = path.parent
+            video = str(video_id)
+            yield MetadataTarget(
+                video_id=video,
+                out_dir=out_dir,
+                info_path=out_dir / f"{video}.info.json",
+            )
+
+
+def _current_media_path(path: Path, media_root: Path) -> Path:
+    raw = str(path)
+    for old in (
+        "/mnt/media/gmk-server-share/approach-clips",
+        "/mnt/storage/approach-clips",
+    ):
+        if raw.startswith(old):
+            return Path(str(media_root) + raw[len(old) :])
+    return path
+
+
+def _chunks(items: list[MetadataTarget], size: int) -> Iterator[list[MetadataTarget]]:
+    for index in range(0, len(items), size):
+        yield items[index : index + size]
+
+
+def _backfill_one_batch(
+    registry: YoutubeRegistry,
+    lane: Lane,
+    batch: list[MetadataTarget],
+) -> int:
+    with lane_lock(lane):
+        _run_metadata_batch(registry, lane, batch)
+    return len(batch)
+
+
+def _run_metadata_batch(
+    registry: YoutubeRegistry,
+    lane: Lane,
+    targets: list[MetadataTarget],
+) -> None:
+    if not targets:
+        return
+    by_dir: dict[Path, list[MetadataTarget]] = {}
+    for target in targets:
+        by_dir.setdefault(target.out_dir, []).append(target)
+
+    for out_dir, grouped in by_dir.items():
+        out_dir.mkdir(parents=True, exist_ok=True)
+        profile = (
+            registry.profiles[lane.profile]
+            if lane.egress == "direct" and lane.profile is not None
+            else None
+        )
+        yt_args = [
+            "--extractor-args",
+            f"youtube:player_client={registry.player_client}",
+            "--skip-download",
+            "--write-info-json",
+            "--ignore-errors",
+            "--no-warnings",
+            "--no-playlist",
+            "-o",
+            str(out_dir / "%(id)s.%(ext)s"),
+            *(target.url for target in grouped),
+        ]
+        if profile is not None:
+            cmd = [
+                sys.executable,
+                "-m",
+                "yt_dlp",
+                "--cookies-from-browser",
+                profile.browser_spec,
+                *yt_args,
+            ]
+        else:
+            cmd = [
+                "docker",
+                "run",
+                "--rm",
+                f"--network=container:{lane.egress}",
+                "-v",
+                f"{out_dir}:{out_dir}",
+                YTDLP_IMAGE,
+                *yt_args,
+            ]
+        subprocess.run(cmd, check=False)
 
 
 @contextmanager

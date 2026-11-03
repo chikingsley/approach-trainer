@@ -1,5 +1,5 @@
 [settings]
-media_root = "/mnt/media/gmk-server-share/approach-clips"
+media_root = "/mnt/massive-22t/approach-clips"
 format = "bv*[height<=1920]+ba/b[height<=1920]/b"
 player_client = "web_safari"
 default_lane = "residential"
@@ -13,6 +13,22 @@ profile = "kasm_profile_1"
 
 [lanes.vpn1]
 egress = "gluetun"
+anonymous = true
+
+[lanes.vpn2]
+egress = "gluetun-lane1"
+anonymous = true
+
+[lanes.vpn3]
+egress = "gluetun-lane2"
+anonymous = true
+
+[lanes.vpn4]
+egress = "gluetun-lane3"
+anonymous = true
+
+[lanes.vpn5]
+egress = "gluetun-lane4"
 anonymous = true
 
 [profiles.kasm_profile_1]

@@ -19,7 +19,7 @@ build-backend = "hatchling.build"
 packages = ["src/approach_trainer"]
 
 [tool.uv.sources]
-omni-curator = { path = "../peacock-asr/packages/omni-curator", editable = true }
+omni-curator = { path = "../../ai-lab/peacock-asr/packages/omni-curator", editable = true }
 
 [dependency-groups]
 dev = [

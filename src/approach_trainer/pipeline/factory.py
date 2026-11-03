@@ -5,8 +5,8 @@ For each NEW video (not yet in the DB) it runs:
   -> write parent row (sources|clips) -> cut-aware segmentation -> write child segments.
 
 Root decides the target table:
-  /mnt/media/pickup-courses/...            -> sources  (long-form; id = md5(path))
-  /mnt/media/.../approach-clips/{ig,yt/<lang>,douyin}/<creator>/<id>.mp4 -> clips (id = stem)
+  /mnt/media-5t/jellyfin/pickup-courses/... -> sources  (long-form; id = md5(path))
+  /mnt/massive-22t/approach-clips/{ig,yt/<lang>,douyin}/<creator>/<id>.mp4 -> clips (id = stem)
 
 Usage:
   uv run --project ~/github/approach-trainer approach-trainer factory <db>
