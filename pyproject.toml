@@ -5,7 +5,7 @@ description = "Approach-training media ingestion, transcription, and segmentatio
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "omni-curator[youtube]",
-    "gallery-dl",
+    "gallery-dl>=1.32.19",
 ]
 
 [project.scripts]
@@ -18,13 +18,20 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/approach_trainer"]
 
+[tool.uv]
+# NeMo 3.0.0 and Lightning 2.4 cap these below the releases that fix advisories.
+override-dependencies = [
+  "fsspec>=2026.9.0",
+  "hydra-core>=1.3.8",
+]
+
 [tool.uv.sources]
 omni-curator = { path = "../../ai-lab/peacock-asr/packages/omni-curator", editable = true }
 
 [dependency-groups]
 dev = [
-    "ruff>=0.15.12",
-    "ty>=0.0.35",
+    "ruff>=0.17.3",
+    "ty>=0.0.97",
 ]
 
 [tool.ruff]
@@ -37,6 +44,7 @@ src = ["src"]
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = [
+    "CPY",      # this repository has no declared copyright owner
     "D",        # these are one-shot pipeline scripts, not a documented library
     "COM812",   # trailing-comma rule conflicts with the formatter
     "ISC001",   # implicit-str-concat rule conflicts with the formatter

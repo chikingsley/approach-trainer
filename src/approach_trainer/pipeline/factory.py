@@ -25,7 +25,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from omni_curator.create.fuse import consensus_fuse
-from omni_curator.swservice import SuperwhisperClient
+from omni_curator.scribe.swservice import SuperwhisperClient
 
 from approach_trainer.languages import language_name, scribe_code, script_of
 from approach_trainer.paths import AUDIO_CACHE, CLIPS_ROOT, COURSES_ROOT
@@ -141,7 +141,7 @@ def _speaker_id(label: object) -> str:
 
 
 def finalize_one(db: sqlite3.Connection, client: SuperwhisperClient, v: Path,
-                 table: str, extra: dict, recs: list[dict]) -> str:
+                 table: str, extra: dict, *, recs: list[dict]) -> str:
     """Given the Scribe records for one video, build consensus, write the parent
     row, segment, and write child rows. (Scribe already done in batch.)"""
     cid = fid_of(v) if table == "sources" else v.stem
@@ -297,7 +297,7 @@ def main() -> None:
             tl.db = sqlite3.connect(args.db, timeout=60)
             tl.client = SuperwhisperClient()
         try:
-            return finalize_one(tl.db, tl.client, v, table, extra, recs_by_fid.get(fid, []))
+            return finalize_one(tl.db, tl.client, v, table, extra, recs=recs_by_fid.get(fid, []))
         except Exception as e:  # noqa: BLE001
             return f"FAIL {v.name}: {e}"
 

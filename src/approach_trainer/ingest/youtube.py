@@ -23,7 +23,7 @@ from approach_trainer.paths import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Generator, Iterator
 
 VIDEO_SUFFIXES = {".mp4", ".mkv", ".webm", ".mov"}
 # Containerized yt-dlp for VPN lanes (runs in a gluetun container's network namespace).
@@ -444,7 +444,7 @@ def _run_metadata_batch(
 
 
 @contextmanager
-def lane_lock(lane: Lane) -> Iterator[None]:
+def lane_lock(lane: Lane) -> Generator[None]:
     lane.lock.parent.mkdir(parents=True, exist_ok=True)
     with lane.lock.open("w", encoding="utf-8") as handle:
         fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
